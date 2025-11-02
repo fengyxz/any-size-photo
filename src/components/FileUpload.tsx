@@ -8,6 +8,12 @@ import {
   CheckCircle2,
   RotateCcw,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { formatFileSize } from "@/lib/utils";
 import type { ImageFile } from "@/types";
 
@@ -21,6 +27,29 @@ interface FileUploadProps {
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({
+  files,
+  onFilesChange,
+  onRemoveFile,
+  onRetryFile,
+  isProcessing,
+  sizeUnit,
+}) => {
+  // 包装整个组件以提供 Tooltip 上下文
+  return (
+    <TooltipProvider delayDuration={200}>
+      <FileUploadContent
+        files={files}
+        onFilesChange={onFilesChange}
+        onRemoveFile={onRemoveFile}
+        onRetryFile={onRetryFile}
+        isProcessing={isProcessing}
+        sizeUnit={sizeUnit}
+      />
+    </TooltipProvider>
+  );
+};
+
+const FileUploadContent: React.FC<FileUploadProps> = ({
   files,
   onFilesChange,
   onRemoveFile,
@@ -298,12 +327,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                       </div>
                     )}
                     {file.status === "error" && (
-                      <div
-                        className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium cursor-help"
-                        title={file.error}
-                      >
-                        失败
-                      </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium cursor-help">
+                            失败
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-sm">{file.error}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
 
                     {file.status === "completed" && file.compressedBlob && (

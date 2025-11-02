@@ -304,7 +304,7 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
               type: "error",
               data: {
                 id,
-                error: `压缩失败：无法将文件压缩到更小。原始大小 ${(
+                error: `压缩失败：无法将文件压缩到更小，请调整压缩大小。原始大小 ${(
                   file.size / 1024
                 ).toFixed(2)}KB`,
               },
