@@ -2,8 +2,8 @@
 // 需要安装: npm install sharp --save-dev
 // 运行: node scripts/generate-icons.js
 
-const fs = require('fs');
-const path = require('path');
+const fs = require("fs");
+const path = require("path");
 
 const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
   <defs>
@@ -21,13 +21,13 @@ const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="6
   <path d="M48 30 L50 32 L48 34" stroke="white" stroke-width="2" stroke-linecap="round" fill="none"/>
 </svg>`;
 
-const publicDir = path.join(__dirname, '../public');
-const svgPath = path.join(publicDir, 'logo.svg');
+const publicDir = path.join(__dirname, "../public");
+const svgPath = path.join(publicDir, "logo.svg");
 
 // 确保 SVG 文件存在
 if (!fs.existsSync(svgPath)) {
-  fs.writeFileSync(svgPath, svgContent, 'utf8');
-  console.log('✓ 已创建 logo.svg');
+  fs.writeFileSync(svgPath, svgContent, "utf8");
+  console.log("✓ 已创建 logo.svg");
 }
 
 console.log(`
@@ -49,4 +49,3 @@ console.log(`
   npm install sharp --save-dev
 然后修改此脚本使用 sharp 库生成 PNG
 `);
-

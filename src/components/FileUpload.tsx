@@ -6,6 +6,7 @@ import {
   Download,
   Inbox,
   CheckCircle2,
+  RotateCcw,
 } from "lucide-react";
 import { formatFileSize } from "@/lib/utils";
 import type { ImageFile } from "@/types";
@@ -14,6 +15,7 @@ interface FileUploadProps {
   files: ImageFile[];
   onFilesChange: (files: File[]) => void;
   onRemoveFile: (fileId: string) => void;
+  onRetryFile: (fileId: string) => void;
   isProcessing: boolean;
   sizeUnit: "auto" | "B" | "KB" | "MB" | "GB";
 }
@@ -22,6 +24,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   files,
   onFilesChange,
   onRemoveFile,
+  onRetryFile,
   isProcessing,
   sizeUnit,
 }) => {
@@ -219,7 +222,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
               processedFiles.map((file) => (
                 <div
                   key={file.id}
-                  className={`flex items-center space-x-4 p-4 rounded-lg hover:bg-green-100/20 transition-colors border overflow-hidden w-full min-w-0 ${
+                  className={`flex items-center space-x-4 p-4 rounded-lg  transition-colors border overflow-hidden w-full min-w-0 ${
                     file.status === "completed"
                       ? "bg-green-50 border-green-200"
                       : "bg-red-50 border-red-200"
@@ -246,21 +249,46 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                     <p className="text-xs text-gray-600 truncate">
                       {formatFileSize(file.originalSize, sizeUnit)}
                     </p>
-                    {file.status === "completed" && file.compressedSize && (
-                      <p className="text-xs text-green-600 font-medium truncate">
-                        压缩后: {formatFileSize(file.compressedSize, sizeUnit)}{" "}
-                        (
-                        {Math.round(
-                          (1 - file.compressedSize / file.originalSize) * 100
-                        )}
-                        % 减少)
-                      </p>
-                    )}
-                    {file.status === "error" && (
-                      <p className="text-xs text-red-600 truncate">
-                        错误: {file.error}
-                      </p>
-                    )}
+                    {file.status === "completed" &&
+                      file.compressedSize !== undefined && (
+                        <p
+                          className={`text-xs font-medium truncate ${
+                            file.compressedSize < file.originalSize
+                              ? "text-green-600"
+                              : file.compressedSize > file.originalSize
+                              ? "text-orange-600"
+                              : "text-gray-600"
+                          }`}
+                        >
+                          压缩后:{" "}
+                          {formatFileSize(file.compressedSize, sizeUnit)}
+                          {file.compressedSize < file.originalSize && (
+                            <span>
+                              {" "}
+                              (
+                              {Math.round(
+                                (1 - file.compressedSize / file.originalSize) *
+                                  100
+                              )}
+                              % 减少)
+                            </span>
+                          )}
+                          {file.compressedSize > file.originalSize && (
+                            <span>
+                              {" "}
+                              (
+                              {Math.round(
+                                (file.compressedSize / file.originalSize - 1) *
+                                  100
+                              )}
+                              % 增加，已保留原图)
+                            </span>
+                          )}
+                          {file.compressedSize === file.originalSize && (
+                            <span> (无变化)</span>
+                          )}
+                        </p>
+                      )}
                   </div>
 
                   <div className="flex items-center space-x-2 shrink-0">
@@ -270,8 +298,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                       </div>
                     )}
                     {file.status === "error" && (
-                      <div className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium">
-                        错误
+                      <div
+                        className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium cursor-help"
+                        title={file.error}
+                      >
+                        失败
                       </div>
                     )}
 
@@ -285,10 +316,21 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                       </button>
                     )}
 
+                    {file.status === "error" && (
+                      <button
+                        onClick={() => onRetryFile(file.id)}
+                        disabled={isProcessing}
+                        className="p-2 text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="重新尝试"
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
+                    )}
+
                     <button
                       onClick={() => onRemoveFile(file.id)}
-                      disabled={isProcessing}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      disabled={isProcessing && file.status === "processing"}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="删除文件"
                     >
                       <X className="h-4 w-4" />

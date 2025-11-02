@@ -53,11 +53,11 @@ export const ProgressDisplay: React.FC<ProgressDisplayProps> = ({
         <div className="bg-gray-200 rounded-full h-3 overflow-hidden">
           <div
             className="bg-gradient-to-r from-blue-500 to-blue-600 h-full transition-all duration-300 ease-out"
-            style={{ width: `${totalProgress}%` }}
+            style={{ width: `${Math.min(100, Math.max(0, totalProgress))}%` }}
           />
         </div>
         <p className="text-sm text-gray-600 mt-2">
-          {totalProgress}% 完成 ({completedFiles + failedFiles} / {files.length}
+          {Math.min(100, Math.max(0, totalProgress))}% 完成 ({completedFiles + failedFiles} / {files.length}
           )
         </p>
       </div>

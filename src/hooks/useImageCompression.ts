@@ -22,7 +22,10 @@ export const useImageCompression = () => {
           setFiles((prev) =>
             prev.map((file) =>
               file.id === data.id
-                ? { ...file, progress: data.progress || 0 }
+                ? {
+                    ...file,
+                    progress: Math.min(100, Math.max(0, data.progress || 0)),
+                  }
                 : file
             )
           );
@@ -39,7 +42,7 @@ export const useImageCompression = () => {
                         status: "completed" as const,
                         compressedBlob: data.result!.compressedBlob,
                         compressedSize: data.result!.compressedSize,
-                        progress: 100,
+                        progress: 100, // 确保完成时进度为100
                       }
                     : file
               );
@@ -184,6 +187,23 @@ export const useImageCompression = () => {
     });
   }, []);
 
+  const retryFile = useCallback((fileId: string) => {
+    setFiles((prev) =>
+      prev.map((file) =>
+        file.id === fileId
+          ? {
+              ...file,
+              status: "pending",
+              progress: 0,
+              error: undefined,
+              compressedBlob: undefined,
+              compressedSize: undefined,
+            }
+          : file
+      )
+    );
+  }, []);
+
   const startCompression = useCallback(() => {
     // 只处理待处理的文件，跳过已处理的文件
     const pendingFiles = files.filter(
@@ -235,12 +255,20 @@ export const useImageCompression = () => {
 
   const completedFiles = files.filter((f) => f.status === "completed").length;
   const failedFiles = files.filter((f) => f.status === "error").length;
-  const totalProgress =
-    files.length > 0
-      ? Math.round(
-          files.reduce((sum, file) => sum + file.progress, 0) / files.length
-        )
-      : 0;
+
+  // 计算总进度：已完成文件数 / 总文件数
+  const calculateTotalProgress = () => {
+    if (files.length === 0) return 0;
+
+    // 进度 = (已完成 + 失败的文件数) / 总文件数 * 100
+    // 例如：6 个文件中，2 个完成 = 2 / 6 * 100 = 33%
+    const processedCount = completedFiles + failedFiles;
+    const totalProgressValue = (processedCount / files.length) * 100;
+
+    return Math.min(100, Math.max(0, Math.round(totalProgressValue)));
+  };
+
+  const totalProgress = calculateTotalProgress();
 
   return {
     files,
@@ -252,6 +280,7 @@ export const useImageCompression = () => {
     addFiles,
     updateFileConfig,
     removeFile,
+    retryFile,
     startCompression,
     clearFiles,
     downloadFile,

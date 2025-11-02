@@ -19,6 +19,7 @@ const defaultConfig: CompressionConfigType = {
   initialQuality: 0.8,
   alwaysKeepResolution: false,
   fileType: "image/jpeg",
+  compressionMode: "size", // 默认为文件大小模式
 };
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
     addFiles,
     updateFileConfig,
     removeFile,
+    retryFile,
     startCompression,
     clearFiles,
     downloadAll,
@@ -58,7 +60,7 @@ function App() {
         {/* 头部 */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-3 mb-4">
-            <Logo size={48} className="flex-shrink-0" />
+            <Logo size={48} className="shrink-0" />
             <h1 className="text-3xl font-bold">智能图片压缩工具</h1>
           </div>
           <p className="text-gray-600 text-lg">
@@ -73,6 +75,7 @@ function App() {
               files={files}
               onFilesChange={handleFilesChange}
               onRemoveFile={removeFile}
+              onRetryFile={retryFile}
               isProcessing={isProcessing}
               sizeUnit={sizeUnit}
             />
