@@ -3,9 +3,10 @@ import { FileUpload } from "./components/FileUpload";
 import { CompressionConfig } from "./components/CompressionConfig";
 import { ProgressDisplay } from "./components/ProgressDisplay";
 import { useImageCompression } from "./hooks/useImageCompression";
-import { Image, Download } from "lucide-react";
+import { Download } from "lucide-react";
 import type { CompressionConfig as CompressionConfigType } from "./types";
 import Intro from "./components/Intro";
+import { Logo } from "./components/Logo";
 
 const defaultConfig: CompressionConfigType = {
   maxSizeMB: 1,
@@ -56,8 +57,8 @@ function App() {
       <div className="container mx-auto px-6 py-8 max-w-7xl">
         {/* 头部 */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center space-x-2 mb-4">
-            <Image className="h-8 w-8 text-blue-600" />
+          <div className="flex items-center justify-center space-x-3 mb-4">
+            <Logo size={48} className="flex-shrink-0" />
             <h1 className="text-3xl font-bold">智能图片压缩工具</h1>
           </div>
           <p className="text-gray-600 text-lg">

@@ -146,14 +146,14 @@ export const CompressionConfig: React.FC<CompressionConfigProps> = ({
     if (files.length === 0) {
       return 0; // 没有文件时返回0
     }
-
+    
     // 计算所有文件的总大小
     const totalOriginalSize = files.reduce(
       (sum, file) => sum + file.originalSize,
       0
     );
     const averageOriginalSizeMB = totalOriginalSize / (1024 * 1024); // 转换为MB
-
+    
     // 基于质量的经验公式：压缩后大小 ≈ 原始大小 × 质量^2 × 0.8
     const compressionRatio = Math.pow(quality, 2) * 0.8;
     return averageOriginalSizeMB * compressionRatio;
@@ -287,29 +287,29 @@ export const CompressionConfig: React.FC<CompressionConfigProps> = ({
 
                     const value = parseFloat(valueStr);
                     if (!isNaN(value)) {
-                      setMaxSizeValue(value);
-                      const convertedValue = convertFileSize(
-                        value,
-                        maxSizeUnit,
-                        "MB"
-                      );
-                      const recommendedQuality =
-                        getRecommendedQuality(convertedValue);
+                  setMaxSizeValue(value);
+                  const convertedValue = convertFileSize(
+                    value,
+                    maxSizeUnit,
+                    "MB"
+                  );
+                  const recommendedQuality =
+                    getRecommendedQuality(convertedValue);
 
-                      // 立即更新配置，确保同步
-                      const newConfig = {
-                        ...config,
-                        maxSizeMB: convertedValue,
-                        quality:
-                          compressionMode === "size"
-                            ? recommendedQuality
-                            : config.quality,
-                        initialQuality:
-                          compressionMode === "size"
-                            ? recommendedQuality
-                            : config.initialQuality,
-                      };
-                      handleConfigUpdate(newConfig);
+                  // 立即更新配置，确保同步
+                  const newConfig = {
+                    ...config,
+                    maxSizeMB: convertedValue,
+                    quality:
+                      compressionMode === "size"
+                        ? recommendedQuality
+                        : config.quality,
+                    initialQuality:
+                      compressionMode === "size"
+                        ? recommendedQuality
+                        : config.initialQuality,
+                  };
+                  handleConfigUpdate(newConfig);
                     }
                   }
                 }}
@@ -381,13 +381,13 @@ export const CompressionConfig: React.FC<CompressionConfigProps> = ({
 
           {/* 宽高比例模式选择 */}
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-            <div>
-              <Label
+          <div>
+            <Label
                 htmlFor="keepAspectRatio"
-                className="text-sm font-medium text-gray-900"
-              >
+              className="text-sm font-medium text-gray-900"
+            >
                 保持原始比例
-              </Label>
+            </Label>
               <p className="text-xs text-gray-600 mt-1">
                 关闭时可能扭曲图片，按设置的宽高强制拉伸
               </p>
@@ -545,7 +545,7 @@ export const CompressionConfig: React.FC<CompressionConfigProps> = ({
                 预计文件大小
               </span>
               <span className="text-xs text-blue-600 ml-2">
-                {files.length > 0
+                {files.length > 0 
                   ? `(基于${files.length}个文件，平均${(
                       files.reduce((sum, file) => sum + file.originalSize, 0) /
                       files.length /
