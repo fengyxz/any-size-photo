@@ -290,184 +290,44 @@ self.onmessage = async (event: MessageEvent<WorkerMessage>) => {
           compressionOptions
         );
 
-        // 不在第一次就报错，而是继续尝试
-        let finalFile = compressedFile;
-        let finalSize = compressedFile.size;
+        // 直接检查压缩结果
+        const finalFile = compressedFile;
+        const finalSize = compressedFile.size;
         const targetSizeBytes = config.maxSizeMB * 1024 * 1024;
 
-        // 记录最佳结果（最小的文件，只要比原图小）
-        let bestFile = compressedFile;
-        let bestSize = compressedFile.size;
-
-        // 文件大小模式：如果结果仍然大于目标大小，进行渐进式压缩
+        // 文件大小模式：检查是否达到目标
         if (config.compressionMode === "size") {
-          let currentFile = compressedFile;
-          let currentSize = finalSize;
-          const maxAttempts = 5;
-          let attempts = 0;
-
-          // 如果第一次压缩就比原图小且达标，跳过循环
-          const needsMoreCompression =
-            currentSize > targetSizeBytes || currentSize >= file.size;
-
-          while (needsMoreCompression && attempts < maxAttempts) {
-            attempts++;
-
-            // 如果当前结果比原图小，更新最佳结果
-            if (currentSize < file.size && currentSize < bestSize) {
-              bestFile = currentFile;
-              bestSize = currentSize;
-            }
-
-            // 如果已经达标，退出
-            if (currentSize <= targetSizeBytes && currentSize < file.size) {
-              break;
-            }
-
-            if (config.fileType === "image/png") {
-              // PNG: 通过减小尺寸来压缩
-              // 计算需要缩小多少才能达到目标大小
-              // 假设文件大小与像素数量大致成正比（实际上是平方关系）
-              const sizeRatio = targetSizeBytes / currentSize;
-              // 由于文件大小与面积相关（像素数的平方），所以使用平方根
-              // 使用更小的安全系数，更激进的压缩
-              const scaleFactor = Math.sqrt(sizeRatio * 0.7); // 0.7 是更激进的安全系数
-
-              try {
-                const currentImg = await createImageBitmap(currentFile);
-                const newWidth = Math.max(
-                  50,
-                  Math.round(currentImg.width * scaleFactor)
-                );
-                const newHeight = Math.max(
-                  50,
-                  Math.round(currentImg.height * scaleFactor)
-                );
-
-                // 如果尺寸没有变化或变化太小，说明已经不能再缩小了
-                if (
-                  newWidth >= currentImg.width - 5 &&
-                  newHeight >= currentImg.height - 5
-                ) {
-                  break;
-                }
-
-                const canvas = new OffscreenCanvas(newWidth, newHeight);
-                const ctx = canvas.getContext("2d");
-                if (ctx) {
-                  // 使用更好的图片缩放算法（如果有的话）
-                  ctx.imageSmoothingEnabled = true;
-                  ctx.imageSmoothingQuality = "high";
-                  ctx.drawImage(currentImg, 0, 0, newWidth, newHeight);
-
-                  // 对于 PNG，尝试使用更高效的压缩设置
-                  // 注意：Canvas API 的 convertToBlob 对 PNG 支持有限
-                  const blob = await canvas.convertToBlob({
-                    type: "image/png",
-                  });
-                  const moreCompressed = new File([blob], file.name, {
-                    type: "image/png",
-                  });
-
-                  currentFile = moreCompressed;
-                  currentSize = moreCompressed.size;
-
-                  // 更新最佳结果
-                  if (currentSize < file.size && currentSize < bestSize) {
-                    bestFile = moreCompressed;
-                    bestSize = currentSize;
-                  }
-
-                  // 更新最终文件
-                  finalFile = moreCompressed;
-                  finalSize = currentSize;
-
-                  // 如果达到目标且比原图小，退出循环
-                  if (
-                    currentSize <= targetSizeBytes &&
-                    currentSize < file.size
-                  ) {
-                    break;
-                  }
-
-                  // 如果压缩后反而更大了，停止尝试
-                  if (moreCompressed.size >= currentSize) {
-                    break;
-                  }
-                } else {
-                  break;
-                }
-              } catch {
-                break; // 发生错误，停止尝试
-              }
-            } else {
-              // 非 PNG: 尝试更低的质量
-              const qualityReduction = 0.75; // 每次降低质量到原来的 75%
-              const newQuality = Math.max(
-                0.1,
-                compressionOptions.initialQuality *
-                  Math.pow(qualityReduction, attempts)
-              );
-
-              try {
-                const moreAggressiveOptions = {
-                  ...compressionOptions,
-                  initialQuality: newQuality,
-                };
-                const moreCompressed = await imageCompression(
-                  imageFile,
-                  moreAggressiveOptions
-                );
-
-                currentSize = moreCompressed.size;
-
-                // 更新最佳结果
-                if (currentSize < file.size && currentSize < bestSize) {
-                  bestFile = moreCompressed;
-                  bestSize = currentSize;
-                }
-
-                // 更新最终文件
-                finalFile = moreCompressed;
-                finalSize = currentSize;
-
-                // 如果达到目标且比原图小，退出循环
-                if (currentSize <= targetSizeBytes && currentSize < file.size) {
-                  break;
-                }
-
-                // 如果压缩后反而更大了，停止尝试
-                if (moreCompressed.size >= currentSize) {
-                  break;
-                }
-              } catch {
-                break; // 发生错误，停止尝试
-              }
-            }
-          }
-
-          // 5次尝试后的结果处理：
-          // 1. 如果有任何一次压缩比原图小，使用最佳结果
-          // 2. 如果所有尝试都没有变小，标记为失败
-          if (bestSize < file.size) {
-            // 使用最佳结果（最小的文件）
-            finalFile = bestFile;
-            finalSize = bestSize;
-          } else if (finalSize >= file.size) {
-            // 5次尝试后仍然失败：文件没有变小
+          // 检查压缩结果
+          if (finalSize >= file.size) {
+            // 文件没有变小，失败
             self.postMessage({
               type: "error",
               data: {
                 id,
-                error: `压缩失败：尝试了${attempts}次，无法将文件压缩到更小。原始大小 ${(
+                error: `压缩失败：无法将文件压缩到更小。原始大小 ${(
                   file.size / 1024
-                ).toFixed(2)}KB，最佳结果 ${(bestSize / 1024).toFixed(2)}KB`,
+                ).toFixed(2)}KB`,
+              },
+            });
+            break;
+          } else if (finalSize > targetSizeBytes) {
+            // 没有达到目标大小，失败
+            self.postMessage({
+              type: "error",
+              data: {
+                id,
+                error: `压缩失败：无法达到目标大小 ${(
+                  targetSizeBytes / 1024
+                ).toFixed(2)}KB。原始 ${(file.size / 1024).toFixed(
+                  2
+                )}KB → 压缩后 ${(finalSize / 1024).toFixed(2)}KB`,
               },
             });
             break;
           }
+          // 达到目标且比原图小，继续往下执行（显示成功）
         } else if (finalSize >= file.size) {
-          // 非 size 模式，如果第一次压缩就失败
+          // 非 size 模式，如果压缩失败
           self.postMessage({
             type: "error",
             data: {
