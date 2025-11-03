@@ -758,7 +758,7 @@ export const CompressionConfig: React.FC<CompressionConfigProps> = ({
         <Button
           onClick={onStartCompression}
           disabled={!hasFiles || isProcessing}
-          className="flex-1"
+          className="w-full sm:flex-1"
           size="sm"
         >
           {isProcessing ? "压缩中..." : "开始压缩"}
@@ -768,6 +768,7 @@ export const CompressionConfig: React.FC<CompressionConfigProps> = ({
           onClick={onClearFiles}
           variant="outline"
           disabled={isProcessing}
+          className="w-full sm:w-auto"
           size="sm"
         >
           <RotateCcw className="h-4 w-4 mr-2" />

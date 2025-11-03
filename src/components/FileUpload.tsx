@@ -523,7 +523,9 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
                             <h4 className="font-semibold text-sm text-red-600">
                               压缩失败
                             </h4>
-                            <p className="text-sm text-gray-700">{file.error}</p>
+                            <p className="text-sm text-gray-700">
+                              {file.error}
+                            </p>
                           </div>
                         </PopoverContent>
                       </Popover>
