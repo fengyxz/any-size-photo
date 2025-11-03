@@ -60,85 +60,136 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isConverting, setIsConverting] = useState(false);
-  const [convertProgress, setConvertProgress] = useState({ current: 0, total: 0 });
+  const [convertProgress, setConvertProgress] = useState({
+    current: 0,
+    total: 0,
+  });
 
   // 转换 HEIC 文件为 JPEG
-  const convertHeicFiles = useCallback(async (files: File[]): Promise<File[]> => {
-    const heicFiles: File[] = [];
-    const normalFiles: File[] = [];
+  const convertHeicFiles = useCallback(
+    async (files: File[]): Promise<File[]> => {
+      const heicFiles: File[] = [];
+      const normalFiles: File[] = [];
 
-    // 分类文件
-    files.forEach((file) => {
-      const isHeic =
-        file.type === "image/heic" ||
-        file.type === "image/heif" ||
-        file.name.toLowerCase().endsWith(".heic") ||
-        file.name.toLowerCase().endsWith(".heif");
-      
-      if (isHeic) {
-        heicFiles.push(file);
-      } else {
-        normalFiles.push(file);
+      // 分类文件
+      files.forEach((file) => {
+        const isHeic =
+          file.type === "image/heic" ||
+          file.type === "image/heif" ||
+          file.name.toLowerCase().endsWith(".heic") ||
+          file.name.toLowerCase().endsWith(".heif");
+
+        if (isHeic) {
+          heicFiles.push(file);
+        } else {
+          normalFiles.push(file);
+        }
+      });
+
+      if (heicFiles.length === 0) {
+        return files; // 没有HEIC文件，直接返回
       }
-    });
 
-    if (heicFiles.length === 0) {
-      return files; // 没有HEIC文件，直接返回
-    }
+      // 开始转换
+      setIsConverting(true);
+      setConvertProgress({ current: 0, total: heicFiles.length });
 
-    // 开始转换
-    setIsConverting(true);
-    setConvertProgress({ current: 0, total: heicFiles.length });
+      const convertedFiles: File[] = [];
 
-    const convertedFiles: File[] = [];
+      for (let i = 0; i < heicFiles.length; i++) {
+        const heicFile = heicFiles[i];
+        setConvertProgress({ current: i + 1, total: heicFiles.length });
 
-    for (let i = 0; i < heicFiles.length; i++) {
-      const heicFile = heicFiles[i];
-      setConvertProgress({ current: i + 1, total: heicFiles.length });
+        try {
+          console.log(
+            `开始转换 ${heicFile.name}, 类型: ${heicFile.type}, 大小: ${heicFile.size}`
+          );
 
-      try {
-        // 转换 HEIC 到 JPEG
-        const convertedBlob = await heic2any({
-          blob: heicFile,
-          toType: "image/jpeg",
-          quality: 0.95, // 高质量转换
-        });
+          // 转换 HEIC 到 JPEG
+          const convertedBlob = await heic2any({
+            blob: heicFile,
+            toType: "image/jpeg",
+            quality: 0.95, // 高质量转换
+          });
 
-        // heic2any 可能返回 Blob 或 Blob[]
-        const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+          console.log(`转换成功 ${heicFile.name}`);
 
-        // 创建新的 File 对象
-        const newFileName = heicFile.name.replace(/\.(heic|heif)$/i, ".jpg");
-        const convertedFile = new File([blob], newFileName, {
-          type: "image/jpeg",
-          lastModified: Date.now(),
-        });
+          // heic2any 可能返回 Blob 或 Blob[]
+          const blob = Array.isArray(convertedBlob)
+            ? convertedBlob[0]
+            : convertedBlob;
 
-        convertedFiles.push(convertedFile);
-      } catch (error) {
-        console.error(`转换 ${heicFile.name} 失败:`, error);
-        // 转换失败时，仍然尝试添加原文件（可能部分浏览器支持）
-        convertedFiles.push(heicFile);
+          // 创建新的 File 对象
+          const newFileName = heicFile.name.replace(/\.(heic|heif)$/i, ".jpg");
+          const convertedFile = new File([blob], newFileName, {
+            type: "image/jpeg",
+            lastModified: Date.now(),
+          });
+
+          console.log(
+            `创建新文件 ${newFileName}, 类型: ${convertedFile.type}, 大小: ${convertedFile.size}`
+          );
+          convertedFiles.push(convertedFile);
+        } catch (error) {
+          console.error(`转换 ${heicFile.name} 失败:`, error);
+          
+          // 提取更友好的错误信息
+          let errorMessage = "未知错误";
+          if (error && typeof error === 'object') {
+            // @ts-expect-error - heic2any 错误对象结构不明确
+            if (error.code?.value === 2) {
+              errorMessage = "无法解析 HEIF 文件。可能是 Live Photo（实况照片）或特殊格式。";
+            } else if (error instanceof Error) {
+              errorMessage = error.message;
+            } else {
+              // @ts-expect-error - 未知错误对象结构
+              errorMessage = error.message || JSON.stringify(error);
+            }
+          }
+          
+          console.warn(`跳过文件 ${heicFile.name}: ${errorMessage}`);
+          
+          // 不添加失败的文件，静默跳过
+          // convertedFiles.push(heicFile); // 注释掉，不添加无法转换的文件
+        }
       }
-    }
 
-    setIsConverting(false);
-    setConvertProgress({ current: 0, total: 0 });
+      setIsConverting(false);
+      setConvertProgress({ current: 0, total: 0 });
 
-    // 返回转换后的文件 + 普通文件
-    return [...normalFiles, ...convertedFiles];
-  }, []);
+      // 显示转换结果摘要
+      const failedCount = heicFiles.length - convertedFiles.length;
+      if (failedCount > 0) {
+        alert(
+          `⚠️ HEIC 转换完成\n\n` +
+          `✅ 成功: ${convertedFiles.length} 个文件\n` +
+          `❌ 失败: ${failedCount} 个文件\n\n` +
+          `失败原因可能是：\n` +
+          `• Live Photo（实况照片）\n` +
+          `• 连拍照片\n` +
+          `• 不支持的 HEIC 变体\n\n` +
+          `建议：\n` +
+          `1. 在 iPhone 设置 → 相机 → 格式，选择"最兼容"\n` +
+          `2. 或使用在线工具转换：convertio.co/zh/heic-jpg/`
+        );
+      }
+
+      // 返回转换后的文件 + 普通文件
+      return [...normalFiles, ...convertedFiles];
+    },
+    []
+  );
 
   const handleFileSelect = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFiles = Array.from(event.target.files || []);
-      
+
       if (selectedFiles.length === 0) return;
 
       // 自动转换 HEIC 文件
       const processedFiles = await convertHeicFiles(selectedFiles);
       onFilesChange(processedFiles);
-      
+
       // 清空 input 值，允许重复选择相同文件
       if (event.target) {
         event.target.value = "";
@@ -151,12 +202,13 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
     async (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
       const droppedFiles = Array.from(event.dataTransfer.files);
-      const imageFiles = droppedFiles.filter((file) =>
-        file.type.startsWith("image/") || 
-        file.name.toLowerCase().endsWith(".heic") ||
-        file.name.toLowerCase().endsWith(".heif")
+      const imageFiles = droppedFiles.filter(
+        (file) =>
+          file.type.startsWith("image/") ||
+          file.name.toLowerCase().endsWith(".heic") ||
+          file.name.toLowerCase().endsWith(".heif")
       );
-      
+
       if (imageFiles.length === 0) return;
 
       // 自动转换 HEIC 文件
@@ -240,12 +292,13 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
           <p className="text-xs text-green-600 mt-1">
             ✅ 自动转换 iPhone HEIC 格式为 JPEG
           </p>
-          
+
           {/* 转换进度提示 */}
           {isConverting && (
             <div className="mt-3 p-2 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-600">
-                正在转换 HEIC 图片... ({convertProgress.current}/{convertProgress.total})
+                正在转换 HEIC 图片... ({convertProgress.current}/
+                {convertProgress.total})
               </p>
             </div>
           )}
