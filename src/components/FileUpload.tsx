@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { formatFileSize } from "@/lib/utils";
 import type { ImageFile } from "@/types";
-import heic2any from "heic2any";
+import libheif from "libheif-js";
 
 interface FileUploadProps {
   files: ImageFile[];
@@ -95,6 +95,10 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
       setConvertProgress({ current: 0, total: heicFiles.length });
 
       const convertedFiles: File[] = [];
+      const failedFiles: Array<{ name: string; error: string }> = [];
+
+      // 初始化 libheif 解码器 (WebAssembly 版本，更强大)
+      const decoder = new libheif.HeifDecoder();
 
       for (let i = 0; i < heicFiles.length; i++) {
         const heicFile = heicFiles[i];
@@ -102,24 +106,75 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
 
         try {
           console.log(
-            `开始转换 ${heicFile.name}, 类型: ${heicFile.type}, 大小: ${heicFile.size}`
+            `[libheif] 开始转换 ${heicFile.name}, 大小: ${heicFile.size}`
           );
 
-          // 转换 HEIC 到 JPEG
-          const convertedBlob = await heic2any({
-            blob: heicFile,
-            toType: "image/jpeg",
-            quality: 0.95, // 高质量转换
+          // 1. 读取文件为 ArrayBuffer
+          const arrayBuffer = await heicFile.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+
+          // 2. 解码 HEIC 文件
+          const images = decoder.decode(uint8Array);
+          if (!images || images.length === 0) {
+            throw new Error("未找到图像数据");
+          }
+
+          // 3. 获取主图（Live Photo 会有多张，取第一张）
+          const image = images[0];
+          const width = image.get_width();
+          const height = image.get_height();
+
+          console.log(`[libheif] 解码成功: ${width}x${height}px`);
+
+          // 4. 转换为 ImageData (RGBA)
+          const imageData = await new Promise<ImageData>((resolve, reject) => {
+            const buffer = new Uint8ClampedArray(width * height * 4);
+            image.display(
+              { data: buffer, width, height },
+              (displayData: {
+                data: Uint8ClampedArray;
+                width: number;
+                height: number;
+              }) => {
+                if (!displayData || !displayData.data) {
+                  reject(new Error("显示数据为空"));
+                  return;
+                }
+                // 使用传入的 buffer 创建 ImageData
+                const imgData = new ImageData(
+                  new Uint8ClampedArray(buffer),
+                  displayData.width,
+                  displayData.height
+                );
+                resolve(imgData);
+              }
+            );
           });
 
-          console.log(`转换成功 ${heicFile.name}`);
+          // 5. 使用 Canvas 转换为 JPEG
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            throw new Error("无法创建 Canvas 上下文");
+          }
 
-          // heic2any 可能返回 Blob 或 Blob[]
-          const blob = Array.isArray(convertedBlob)
-            ? convertedBlob[0]
-            : convertedBlob;
+          ctx.putImageData(imageData, 0, 0);
 
-          // 创建新的 File 对象
+          // 6. 导出为 JPEG Blob
+          const blob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(
+              (b) => {
+                if (b) resolve(b);
+                else reject(new Error("Canvas toBlob 失败"));
+              },
+              "image/jpeg",
+              0.95 // 高质量
+            );
+          });
+
+          // 7. 创建新的 File 对象
           const newFileName = heicFile.name.replace(/\.(heic|heif)$/i, ".jpg");
           const convertedFile = new File([blob], newFileName, {
             type: "image/jpeg",
@@ -127,30 +182,13 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
           });
 
           console.log(
-            `创建新文件 ${newFileName}, 类型: ${convertedFile.type}, 大小: ${convertedFile.size}`
+            `[libheif] ✅ ${newFileName}, 大小: ${convertedFile.size}`
           );
           convertedFiles.push(convertedFile);
         } catch (error) {
-          console.error(`转换 ${heicFile.name} 失败:`, error);
-          
-          // 提取更友好的错误信息
-          let errorMessage = "未知错误";
-          if (error && typeof error === 'object') {
-            // @ts-expect-error - heic2any 错误对象结构不明确
-            if (error.code?.value === 2) {
-              errorMessage = "无法解析 HEIF 文件。可能是 Live Photo（实况照片）或特殊格式。";
-            } else if (error instanceof Error) {
-              errorMessage = error.message;
-            } else {
-              // @ts-expect-error - 未知错误对象结构
-              errorMessage = error.message || JSON.stringify(error);
-            }
-          }
-          
-          console.warn(`跳过文件 ${heicFile.name}: ${errorMessage}`);
-          
-          // 不添加失败的文件，静默跳过
-          // convertedFiles.push(heicFile); // 注释掉，不添加无法转换的文件
+          console.error(`[libheif] ❌ ${heicFile.name}:`, error);
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          failedFiles.push({ name: heicFile.name, error: errorMsg });
         }
       }
 
@@ -158,20 +196,22 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
       setConvertProgress({ current: 0, total: 0 });
 
       // 显示转换结果摘要
-      const failedCount = heicFiles.length - convertedFiles.length;
-      if (failedCount > 0) {
+      if (failedFiles.length > 0) {
+        const failedList = failedFiles
+          .map((f) => `  • ${f.name}: ${f.error}`)
+          .join("\n");
+
         alert(
           `⚠️ HEIC 转换完成\n\n` +
-          `✅ 成功: ${convertedFiles.length} 个文件\n` +
-          `❌ 失败: ${failedCount} 个文件\n\n` +
-          `失败原因可能是：\n` +
-          `• Live Photo（实况照片）\n` +
-          `• 连拍照片\n` +
-          `• 不支持的 HEIC 变体\n\n` +
-          `建议：\n` +
-          `1. 在 iPhone 设置 → 相机 → 格式，选择"最兼容"\n` +
-          `2. 或使用在线工具转换：convertio.co/zh/heic-jpg/`
+            `✅ 成功: ${convertedFiles.length} 个文件\n` +
+            `❌ 失败: ${failedFiles.length} 个文件\n\n` +
+            `失败详情：\n${failedList}\n\n` +
+            `建议：\n` +
+            `1. 在 iPhone 设置 → 相机 → 格式，选择"最兼容"\n` +
+            `2. 或使用桌面工具：iMazing HEIC Converter`
         );
+      } else if (convertedFiles.length > 0) {
+        console.log(`[libheif] 🎉 全部成功: ${convertedFiles.length} 个文件`);
       }
 
       // 返回转换后的文件 + 普通文件
