@@ -9,11 +9,10 @@ import {
   RotateCcw,
 } from "lucide-react";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { formatFileSize } from "@/lib/utils";
 import type { ImageFile } from "@/types";
 import libheif from "libheif-js";
@@ -35,18 +34,15 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   isProcessing,
   sizeUnit,
 }) => {
-  // 包装整个组件以提供 Tooltip 上下文
   return (
-    <TooltipProvider delayDuration={200}>
-      <FileUploadContent
-        files={files}
-        onFilesChange={onFilesChange}
-        onRemoveFile={onRemoveFile}
-        onRetryFile={onRetryFile}
-        isProcessing={isProcessing}
-        sizeUnit={sizeUnit}
-      />
-    </TooltipProvider>
+    <FileUploadContent
+      files={files}
+      onFilesChange={onFilesChange}
+      onRemoveFile={onRemoveFile}
+      onRetryFile={onRetryFile}
+      isProcessing={isProcessing}
+      sizeUnit={sizeUnit}
+    />
   );
 };
 
@@ -187,7 +183,8 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
           convertedFiles.push(convertedFile);
         } catch (error) {
           console.error(`[libheif] ❌ ${heicFile.name}:`, error);
-          const errorMsg = error instanceof Error ? error.message : String(error);
+          const errorMsg =
+            error instanceof Error ? error.message : String(error);
           failedFiles.push({ name: heicFile.name, error: errorMsg });
         }
       }
@@ -515,16 +512,21 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
                       </div>
                     )}
                     {file.status === "error" && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium cursor-help">
-                            失败
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button className="px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium hover:bg-red-200 transition-colors">
+                            失败 ⓘ
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="max-w-xs">
+                          <div className="space-y-2">
+                            <h4 className="font-semibold text-sm text-red-600">
+                              压缩失败
+                            </h4>
+                            <p className="text-sm text-gray-700">{file.error}</p>
                           </div>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">
-                          <p className="text-sm">{file.error}</p>
-                        </TooltipContent>
-                      </Tooltip>
+                        </PopoverContent>
+                      </Popover>
                     )}
 
                     {file.status === "completed" && file.compressedBlob && (
