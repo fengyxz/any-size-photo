@@ -151,15 +151,30 @@ export const useImageCompression = () => {
 
   const addFiles = useCallback(
     (newFiles: File[], defaultConfig: CompressionConfig) => {
-      const imageFiles: ImageFile[] = newFiles.map((file) => ({
-        id: Math.random().toString(36).substr(2, 9),
-        file,
-        originalSize: file.size,
-        status: "pending",
-        progress: 0,
-        config: { ...defaultConfig },
-        preview: URL.createObjectURL(file),
-      }));
+      const imageFiles: ImageFile[] = newFiles.map((file) => {
+        // 创建预览URL（转换后的JPEG文件可以正常预览）
+        let previewUrl: string | undefined;
+        try {
+          // 只为支持的图片类型创建预览
+          if (file.type.startsWith('image/') && 
+              file.type !== 'image/heic' && 
+              file.type !== 'image/heif') {
+            previewUrl = URL.createObjectURL(file);
+          }
+        } catch (error) {
+          console.error(`创建预览失败 ${file.name}:`, error);
+        }
+
+        return {
+          id: Math.random().toString(36).substr(2, 9),
+          file,
+          originalSize: file.size,
+          status: "pending",
+          progress: 0,
+          config: { ...defaultConfig },
+          preview: previewUrl,
+        };
+      });
 
       setFiles((prev) => [...prev, ...imageFiles]);
     },

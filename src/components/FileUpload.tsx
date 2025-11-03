@@ -1,4 +1,4 @@
-import React, { useRef, useCallback, useMemo } from "react";
+import React, { useRef, useCallback, useMemo, useState } from "react";
 import {
   Upload,
   Image as ImageIcon,
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/tooltip";
 import { formatFileSize } from "@/lib/utils";
 import type { ImageFile } from "@/types";
+import heic2any from "heic2any";
 
 interface FileUploadProps {
   files: ImageFile[];
@@ -58,29 +59,111 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
   sizeUnit,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertProgress, setConvertProgress] = useState({ current: 0, total: 0 });
+
+  // 转换 HEIC 文件为 JPEG
+  const convertHeicFiles = useCallback(async (files: File[]): Promise<File[]> => {
+    const heicFiles: File[] = [];
+    const normalFiles: File[] = [];
+
+    // 分类文件
+    files.forEach((file) => {
+      const isHeic =
+        file.type === "image/heic" ||
+        file.type === "image/heif" ||
+        file.name.toLowerCase().endsWith(".heic") ||
+        file.name.toLowerCase().endsWith(".heif");
+      
+      if (isHeic) {
+        heicFiles.push(file);
+      } else {
+        normalFiles.push(file);
+      }
+    });
+
+    if (heicFiles.length === 0) {
+      return files; // 没有HEIC文件，直接返回
+    }
+
+    // 开始转换
+    setIsConverting(true);
+    setConvertProgress({ current: 0, total: heicFiles.length });
+
+    const convertedFiles: File[] = [];
+
+    for (let i = 0; i < heicFiles.length; i++) {
+      const heicFile = heicFiles[i];
+      setConvertProgress({ current: i + 1, total: heicFiles.length });
+
+      try {
+        // 转换 HEIC 到 JPEG
+        const convertedBlob = await heic2any({
+          blob: heicFile,
+          toType: "image/jpeg",
+          quality: 0.95, // 高质量转换
+        });
+
+        // heic2any 可能返回 Blob 或 Blob[]
+        const blob = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+
+        // 创建新的 File 对象
+        const newFileName = heicFile.name.replace(/\.(heic|heif)$/i, ".jpg");
+        const convertedFile = new File([blob], newFileName, {
+          type: "image/jpeg",
+          lastModified: Date.now(),
+        });
+
+        convertedFiles.push(convertedFile);
+      } catch (error) {
+        console.error(`转换 ${heicFile.name} 失败:`, error);
+        // 转换失败时，仍然尝试添加原文件（可能部分浏览器支持）
+        convertedFiles.push(heicFile);
+      }
+    }
+
+    setIsConverting(false);
+    setConvertProgress({ current: 0, total: 0 });
+
+    // 返回转换后的文件 + 普通文件
+    return [...normalFiles, ...convertedFiles];
+  }, []);
 
   const handleFileSelect = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFiles = Array.from(event.target.files || []);
-      if (selectedFiles.length > 0) {
-        onFilesChange(selectedFiles);
+      
+      if (selectedFiles.length === 0) return;
+
+      // 自动转换 HEIC 文件
+      const processedFiles = await convertHeicFiles(selectedFiles);
+      onFilesChange(processedFiles);
+      
+      // 清空 input 值，允许重复选择相同文件
+      if (event.target) {
+        event.target.value = "";
       }
     },
-    [onFilesChange]
+    [onFilesChange, convertHeicFiles]
   );
 
   const handleDrop = useCallback(
-    (event: React.DragEvent<HTMLDivElement>) => {
+    async (event: React.DragEvent<HTMLDivElement>) => {
       event.preventDefault();
       const droppedFiles = Array.from(event.dataTransfer.files);
       const imageFiles = droppedFiles.filter((file) =>
-        file.type.startsWith("image/")
+        file.type.startsWith("image/") || 
+        file.name.toLowerCase().endsWith(".heic") ||
+        file.name.toLowerCase().endsWith(".heif")
       );
-      if (imageFiles.length > 0) {
-        onFilesChange(imageFiles);
-      }
+      
+      if (imageFiles.length === 0) return;
+
+      // 自动转换 HEIC 文件
+      const processedFiles = await convertHeicFiles(imageFiles);
+      onFilesChange(processedFiles);
     },
-    [onFilesChange]
+    [onFilesChange, convertHeicFiles]
   );
 
   const handleDragOver = useCallback(
@@ -154,11 +237,23 @@ const FileUploadContent: React.FC<FileUploadProps> = ({
           <p className="text-sm text-gray-500">
             支持 JPG、PNG、WebP 等格式，可批量上传
           </p>
+          <p className="text-xs text-green-600 mt-1">
+            ✅ 自动转换 iPhone HEIC 格式为 JPEG
+          </p>
+          
+          {/* 转换进度提示 */}
+          {isConverting && (
+            <div className="mt-3 p-2 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-600">
+                正在转换 HEIC 图片... ({convertProgress.current}/{convertProgress.total})
+              </p>
+            </div>
+          )}
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             onChange={handleFileSelect}
             className="hidden"
             disabled={isProcessing}
